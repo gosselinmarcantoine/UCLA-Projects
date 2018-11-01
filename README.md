@@ -1,2 +1,2 @@
 # UCLA-Projects
-# UCLA-Projects
+# The files found in this document represent the lectures and corresponding weekly projects for the UCLA specialisation program taking place from September 24, 2018 to December 5, 2018. The program is the combination of four classes: UCLA CSX 450-1 // Introduction to Data Science, UCLA CSX 450-4 // Machine Learning with R, UCLA CSX 450-2 // Exploratory Data Analysis and Visualization, UCLA CSX 450-3 // Hadoop and Managing Big Data. More information can be found in the syllabus within this repository.
