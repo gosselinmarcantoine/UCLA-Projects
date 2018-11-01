@@ -1,0 +1,38 @@
+---
+title: "Introduction to R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+Here let's conduct two simulations of correlation.
+
+First, we generate (data generating process) a regression: y = 4 + 1.2*x + e with 600 obersvations. The error term (e) is generated from rnorm function for random numebr with normal distribution with mean of 10 and standard deviation of 5.
+
+```{r}
+x=rnorm(600, mean=10, sd=5)
+y=4+1.2*x+rnorm(600, mean=0, sd=2)
+plot(x,y,pch=20)
+abline(lm(y ~ x), col="blue", lwd=3)
+grid()
+```
+
+
+
+Now let's run the linear regression results for these two simulations.
+
+```{r}
+fit=lm(y~x)
+fit2=lm(y1~x1)
+summary(fit)
+summary(fit2)
+```
+
