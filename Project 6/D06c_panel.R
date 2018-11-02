@@ -3,7 +3,7 @@
 # By William Yu, UCLA Anderson Forecast
 # 11/1/2018
 ##################################################################################################### 
-setwd("C:/Users/wyu/documents/zip08/2018 Q4 Fall_XData/Data")
+setwd("~/Documents/DataScience/UCLADatascience/Project 6")
 
 install.packages("foreign") 
 install.packages("plm") 
@@ -12,6 +12,7 @@ library(car)
 library(gplots)
 library(plm)
 library(Formula)
+library(readxl)
 
 election <- data.frame(read_excel("W06c_election.xlsx"))  
 plotmeans(Dvote~state, data=election)
@@ -26,18 +27,20 @@ ols2=lm(Dvote~Nonwhite+Christian+Mhincome+Mhincomeg+Mhincomeg*D_Incumbent+Mhinco
 summary(ols2)
 
 # Fixed Effect
+# here, ß is calculated by the coefficients of all but the states. The states factor is grouped under year and thus is the fixed effect (Ci)
+
 fixed1=plm(Dvote~Nonwhite+Christian+Mhincome+Mhincomeg+Mhincomeg*D_Incumbent+Mhincomeg*R_Incumbent
            +Mhincomeg*Open_D_Previous, index=c("state","year"), model="within",data=election)
 summary(fixed1)
 
-fixef(fixed1)
+fixef(fixed1) # Don't see intercept (alpha)
 
 fixed2=lm(Dvote~Nonwhite+Christian+Mhincome+Mhincomeg+Mhincomeg*D_Incumbent+Mhincomeg*R_Incumbent
            +Mhincomeg*Open_D_Previous+factor(state), data=election)
-summary(fixed2)
+summary(fixed2) # don't see all 50 states (AK)
 
 fixed3=lm(Dvote~Nonwhite+Christian+Mhincome+Mhincomeg+Mhincomeg*D_Incumbent+Mhincomeg*R_Incumbent
-          +Mhincomeg*Open_D_Previous+factor(state)-1, data=election)   # remove the intercept
+          +Mhincomeg*Open_D_Previous+factor(state)-1, data=election)   # -1 removes the intercept
 summary(fixed3)
 
 # Choice b/w Fixed Effect and Pooling OLS
