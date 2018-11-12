@@ -40,7 +40,7 @@ return=diff(log(sprice))
 head(return)
 summary(12*return)
 
-return6s=rollapply(return,6,sum, align="right")
+return6s=rollapply(return,6,sum, align="right") # sum = cumulative return
 return9s=rollapply(return,9,sum, align="right")
 return12s=rollapply(return,12,sum, align="right")
 head(return6s)

@@ -1,7 +1,7 @@
 ######################################################################################################
 # D06a Models for trends
 # By William Yu, UCLA Anderson Forecast
-# 10/27/2018
+# 10/27/2018, updated 11/6/2018
 ##################################################################################################### 
 install.packages("quantmod")  
 install.packages("tseries") 
@@ -28,6 +28,7 @@ trend2=trend^2
 lrgdp=data.frame(log(GDPC1))
 gdp.df=cbind(gdp,trend,trend2,lrgdp)
 names(gdp.df)=c("rgdp","trend","trend2","lrgdp")
+gdp.ts <-ts(gdp.df,frequency=4,start=c(1947,1))
 
 # Model 1: Linear Trend Model
 model01 <- lm(rgdp~trend,data=gdp.df)
@@ -58,8 +59,10 @@ plot(model03,1)
 ##
 ## Start the sample from 1984Q1
 ##
-gdp.df2=gdp.df[149:length(GDPC1),]
-n=length(GDPC1)-148
+?window
+gdp84=window(gdp.ts, start=c(1984,1))
+n=nrow(gdp84)
+gdp.df2=data.frame(gdp84)
 gdp.df2$trend=seq(1,n)
 gdp.df2$trend2=(gdp.df2$trend)^2
 
@@ -68,7 +71,7 @@ model01a <- lm(rgdp~trend,data=gdp.df2)
 summary(model01a)  
 fit01a <- predict(model01a)
 fit01a.ts <-ts(fit01a,frequency=4,start=c(1984,1))
-ts.plot(GDPC1[-(1:148),], fit01a.ts, col=c("black","red"))
+ts.plot(gdp84[,"rgdp"], fit01a.ts, col=c("black","red"))
 plot(model01a,1)
 
 # Model 2: Quadratic Trend dModel
@@ -76,7 +79,7 @@ model02a <- lm(rgdp~trend+trend2,data=gdp.df2)
 summary(model02a)  
 fit02a <- predict(model02a)
 fit02a.ts <-ts(fit02a,frequency=4,start=c(1984,1))
-ts.plot(GDPC1[-(1:148),], fit02a.ts, lty=c(1,2), lwd=c(1,2))
+ts.plot(gdp84[,"rgdp"], fit02a.ts, lty=c(1,2), lwd=c(1,2))
 plot(model02a,1)
 
 # Model 3: Log-Linear Trend Model
@@ -84,7 +87,7 @@ model03a <- lm(lrgdp~trend,data=gdp.df2)
 summary(model03a)
 fit03a <- predict(model03a)
 fit03a.ts <-ts(fit03a,frequency=4,start=c(1984,1))
-ts.plot(GDPC1[-(1:148),], exp(fit03a.ts), lty=c(1,5), lwd=c(1,3),col=c("black","blue"))
+ts.plot(gdp84[,"rgdp"], exp(fit03a.ts), lty=c(1,5), lwd=c(1,3),col=c("black","blue"))
 plot(model03a,1)
 
 #
@@ -115,11 +118,32 @@ rmse3=sqrt(mean((exp(fit03b)-gdp.df2t[,"rgdp"])^2))
 
 rmse1;rmse2;rmse3
 
-k=nrow(GDPC1)-12
 fit01b.ts <-ts(fit01b,frequency=4,start=c(2015,2))
 fit02b.ts <-ts(fit02b,frequency=4,start=c(2015,2))
 fit03b.ts <-ts(fit03b,frequency=4,start=c(2015,2))
-ts.plot(GDPC1[-(1:k),], fit01b.ts, col=c("black","red"))
-ts.plot(GDPC1[-(1:k),], fit02b.ts, lty=c(1,2), lwd=c(1,2))
-ts.plot(GDPC1[-(1:k),], exp(fit03b.ts), lty=c(1,5), lwd=c(1,3),col=c("black","blue"))
+ts.plot(gdp84[-(1:m),"rgdp"], fit01b.ts, col=c("black","red"))
+ts.plot(gdp84[-(1:m),"rgdp"], fit02b.ts, lty=c(1,2), lwd=c(1,2))
+ts.plot(gdp84[-(1:m),"rgdp"], exp(fit03b.ts), lty=c(1,5), lwd=c(1,3),col=c("black","blue"))
 
+##
+## Using tslm function
+##
+h=10
+model.01c = tslm(rgdp~trend, data=gdp.ts) # trend is a generic, function supplied argument
+fcast.01c = forecast(model.01c, h=h) # h is the forcasting period for prediction
+
+model.spline = tslm(rgdp~trend+I(trend^2)+I(trend^3), data=gdp.ts)
+fcast.spl = forecast(model.spline,h=h)
+
+autoplot(gdp.ts[,"rgdp"]) +
+  autolayer(fitted(model.01c), series="Linear") +
+  autolayer(fitted(model.spline), series="Cubic Spline") +
+  autolayer(fcast.01c, series="Linear") +
+  autolayer(fcast.spl, series="Cubic Spline") +
+  xlab("Year") + ylab("Real GDP") +
+  ggtitle("U.S. Real GDP and Forecasts") +
+  guides(colour = guide_legend(title = ""))
+
+# Natural Cubic Smoothing Splines
+gdp.ts[,"rgdp"] %>% splinef(lambda=0) %>% autoplot()  
+gdp.ts[,"rgdp"] %>% splinef(lambda=0) %>% checkresiduals()  
