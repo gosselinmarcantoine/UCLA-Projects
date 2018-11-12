@@ -64,5 +64,7 @@ zip.sf <- zipcode %>% inner_join(popups, by = c("zip" = "ZIP")) %>% inner_join(z
 
 leaflet()%>%
   addTiles()%>%
-  addMarkers(data = zip.sf, lng = ~LNG, lat = ~LAT) #%>% 
+  addMarkers(data = zip.sf, lng = ~LNG, lat = ~LAT)
+
+# I want to overlay a colored polygon onto the zipcode area representing the percent of professional opportunity. 
   addPolygons(fillColor = zip.sf$professional, opacity = .5)
