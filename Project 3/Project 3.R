@@ -6,10 +6,6 @@
 setwd("~/Documents/DataScience/UCLADatascience/Project 3")
 
 # Install and load packages -----------------------------------------------
-
-install.packages("RColorBrewer")
-install.packages("ggplot2") 
-install.packages("maps")
 library(ggplot2)
 library(readxl) 
 library(dplyr)
@@ -44,7 +40,7 @@ head(cnty3)
 ggplot(cnty3, aes(long,lat,group=group)) + 
   geom_polygon(aes(fill = chci09), colour = rgb(1,1,1,0.2)) + coord_quickmap() 
 
-# Without County boundry --> colour = NA
+# Without County boundary --> colour = NA
 ggplot(cnty3, aes(long,lat,group=group)) + 
   geom_polygon(aes(fill = chci09), colour = NA) + coord_quickmap() +
   scale_fill_gradient(low="lightyellow2", high="darkgreen")
@@ -82,21 +78,23 @@ library(dplyr)
 
 # Format data -------------------------------------------------------------
 
-install.packages("ggrepel")
 library(ggrepel)
 library(readxl)
 
 # Loading datas -----------------------------------------------------------
 
-wdi <- data.frame(read_excel("W03b_wdi.xlsx"))     # World Development Indicators
+setwd("~/Documents/DataScience/Other (SQL)/Miscelleaneous files")
+# Large Datasets not loadable into GitHub
+wdi <- data.frame(read_excel("W03b_wdi.xlsx")) # World Development Indicators
 cpi <- data.frame(read_excel("W03c_cpi.xlsx", skip=2))
+setwd("~/Documents/DataScience/UCLADatascience/Project 3")
 colnames(cpi)[4]="cpi" # rename Column #4 to cpi
 
 
 # Preparing data ----------------------------------------------------------
 
-wdiyp60 = wdiyp[,c("Country.Code", "X1960")]
-colnames(wdiyp60)=c("ISO3","gdppc")
+wdiyp60 = wdi[,c("Country.Code", "X1960")]
+colnames(wdiyp60) = c("ISO3","gdppc")
 
 cpigdp=merge(cpi,wdiyp60, by="ISO3") # Merge two dataset by country code
 
@@ -125,7 +123,7 @@ colnames(wdi3v.60)=c("code", "country", "life","pop","fr")
 p6=ggplot(wdi3v.60, aes(x=life, y=fr, size=pop)) + geom_point(alpha=0.4) + scale_size_continuous(range=c(0.5, 20)) 
 p6
 
-
+rm(list=ls(all=TRUE))
 ## Part B
 
 # Load zillow data --------------------------------------------------------
@@ -135,10 +133,7 @@ p6
 # Adapted from https://www.kaggle.com/c/zillow-prize-1/kernels
 
 setwd("~/Documents/DataScience/UCLADatascience/Project 3")
-
-install.packages("DT")  
-install.packages("corrplot")  
-install.packages("leaflet")  
+ 
 library(data.table)
 library(dplyr)
 library(ggplot2)
@@ -149,11 +144,11 @@ library(corrplot)
 library(leaflet)
 library(lubridate)
 
-setwd("~/Documents/DataScience/UCLADatascience/Project 3/zillow prize project data")
+# Large datasets unloadable on GitHub. Data is on Kaggle: https://www.kaggle.com/c/zillow-prize-1
+setwd("~/Documents/DataScience/Other (SQL)/Miscelleaneous files/zillow prize project data")
 properties <- read.csv('properties_2016.csv')
 transactions <- read.csv('train_2016_v2.csv')
 sample_submission <- read.csv('sample_submission.csv')
-
 setwd("~/Documents/DataScience/UCLADatascience/Project 3")
 
 names(properties)
@@ -167,7 +162,6 @@ hist(properties$yearbuilt)
 table(transactions$transactiondate)
 
 # Rename the variable names
-# FunctionX(dataA) is the same as dataA %>% functionX
 
 properties <- properties %>% rename(
   id_parcel = parcelid,
@@ -219,7 +213,7 @@ properties <- properties %>% rename(
   story = storytypeid,
   heating = heatingorsystemtypeid,
   aircon = airconditioningtypeid,
-  architectural_style= architecturalstyletypeid
+  architectural_style = architecturalstyletypeid
 )
 
 transactions <- transactions %>% rename(

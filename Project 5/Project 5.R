@@ -36,9 +36,9 @@ var_select <- regsubsets(Donation ~
                            Last_donation * Number_donations * First_donation, 
                          data = trainset)
 var_summary <- summary(var_select)
-# which.max(var_summary$adjr2)
-# which.min(var_summary$cp)
-# which.min(var_summary$bic)
+which.max(var_summary$adjr2)
+which.min(var_summary$cp)
+which.min(var_summary$bic)
 
 logistic_reg2 <- glm(Donation ~ 
                        Number_donations + 
@@ -61,7 +61,7 @@ pred_test <- cbind(testset, testset_answers) %>%
 table(pred_test$guess, pred_test$Donation)
 (perc_correct <- sum(pred_test$correct / nrow(pred_test)))
 
-# logistic_reg2 does not seem to be much better than logistic_reg, that said, it contains 2 fewer variables. Also, it is worth noting that the logistic model seem to be worse than guessing no donor will give blood (76%).
+# logistic_reg2 does not seem to be much better than logistic_reg, that said, it contains 2 fewer variables. It is also worth noting that the logistic model seem to be worse than guessing. Predicting all donor will not give blood render a 76% accuracy rate.
 
 
 # 10-Fold CV (all classification techniques) ------------------------------
@@ -78,7 +78,7 @@ control <- trainControl(method="cv", number=10)
 
 # Linear algorithms
 # Linear Discriminant Analysis (LDA)
-set.seed(1)
+# set.seed(1)
 fit.lda <- train(Donation ~ ., 
                  data = blood_train, 
                  method = "lda", 
@@ -87,21 +87,21 @@ fit.lda <- train(Donation ~ .,
 
 # Nonlinear algorithms
 # Classfication and Regression Trees (CART)
-set.seed(2)
+# set.seed(2)
 fit.cart <- train(Donation ~ ., 
                  data=blood_train, method="rpart", 
                  metric = "Accuracy", 
                  trControl = control)
 
 # k-Nearest Neighbors (KNN)
-set.seed(3)
+# set.seed(3)
 fit.knn <- train(Donation ~ ., 
                  data=blood_train, method="knn", 
                  metric = "Accuracy", 
                  trControl = control)
 
 # Support Vector Machines (SVM)
-set.seed(4)
+# set.seed(4)
 fit.svm <- train(Donation ~ ., 
                  data = blood_train, 
                  method = "svmRadial", 
@@ -109,7 +109,7 @@ fit.svm <- train(Donation ~ .,
                  trControl = control)
 
 # Random Forest
-set.seed(5)
+# set.seed(5)
 fit.rf <- train(Donation ~ ., 
                 data = blood_train, 
                 method="rf", 

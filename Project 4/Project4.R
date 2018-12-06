@@ -4,11 +4,6 @@
 
 # Project Setup -----------------------------------------------------------
 
-setwd("~/Documents/DataScience/UCLADatascience/Project 4")
-
-install.packages("DT")  
-install.packages("corrplot")  
-install.packages("leaflet")  
 library(data.table)
 library(dplyr)
 library(ggplot2)
@@ -19,11 +14,10 @@ library(corrplot)
 library(leaflet)
 library(lubridate)
 
-setwd("~/Documents/DataScience/UCLADatascience/Project 3/zillow prize project data")
+setwd("~/Documents/DataScience/Other (SQL)/Miscelleaneous files/zillow prize project data")
 properties <- read.csv('properties_2016.csv')
 transactions <- read.csv('train_2016_v2.csv')
 sample_submission <- read.csv('sample_submission.csv')
-
 setwd("~/Documents/DataScience/UCLADatascience/Project 4")
 
 # Data Exploration --------------------------------------------------------
@@ -112,7 +106,7 @@ properties <- properties %>%
 # Take a look at the data
 properties <- properties %>% select(id_parcel, build_year, starts_with("area_"), 
                                     starts_with("num_"), starts_with("flag_"), starts_with("region_"), everything())
-datatable(head(properties,100), style="bootstrap", class="table-condensed", options = list(dom = 'tp',scrollX = TRUE))
+datatable(head(properties,100), style="bootstrap", class="table-condensed", options = list(dom = 'tp',scrollX = TRUE)) # datatable() is not very clear/usable
 datatable(head(transactions,100), style="bootstrap", class="table-condensed", options = list(dom = 'tp'))
 
 # Take a look at the transaction data
@@ -123,7 +117,7 @@ tmp %>%
   geom_bar(stat="identity", fill="red")+
   geom_vline(aes(xintercept=as.numeric(as.Date("2016-03-20"))),size=1)
 
-# Distribution of Zestaimate's forecast errors (log rror)
+# Distribution of Zestimate's forecast errors (log rror)
 # logerror: log(Zestimate) - log(Saleprice). So a positive logerror means Zestimate is overestimating the Saleprice, 
 # a negative logerror means that Zestimate is underestimating Saleprice. 
 # absolute logerror: a small value means that log(Zestimate) is close to log(Saleprice). 
@@ -135,9 +129,7 @@ transactions %>%
   theme_bw()+theme(axis.title = element_text(size=16),axis.text = element_text(size=14))+
   ylab("Count")+coord_cartesian(x=c(-0.5,0.5))
 
-# Absolute logerror
 transactions <- transactions %>% mutate(abs_logerror = abs(logerror))
-# it is the same as: transactions$abs_logerror=abs(transactions$logerror)
 
 transactions %>% 
   ggplot(aes(x=abs_logerror)) + 
@@ -215,9 +207,7 @@ cor_tmp %>%
   geom_smooth(color="grey40")+
   geom_point(color="red")+coord_cartesian(ylim=c(0,0.075))+theme_bw()
 
-# build_year has a complex relationship with log error. More variability 
-  # and avg logerror from early build_years. I wonder what it looks like when
-  # plotting the same graph with sales price associated to obs. color.
+# build_year has a complex relationship with log error. More variability and avg logerror from early build_years. I wonder what it looks like when plotting the same graph with sales price associated to obs. color.
 
 transactions <- transactions %>% mutate(percentile = cut(abs_logerror,quantile(abs_logerror, probs=c(0, 0.1, 0.25, 0.75, 0.9, 1),names = FALSE),include.lowest = TRUE,labels=FALSE))
 
@@ -248,7 +238,6 @@ tmp %>% ggplot(aes(x=latitude, fill=type, color=type)) + geom_line(stat="density
 tmptrans <- transactions %>% left_join(properties, by="id_parcel")
 tmptrans %>% ggplot(aes(x=latitude,y=abs_logerror))+geom_smooth(color="red")+theme_bw()
 
-
 tmp %>% ggplot(aes(x=longitude, fill=type, color=type)) + geom_line(stat="density", size=1.2) +
   theme_bw()+scale_fill_brewer(palette=col_pal)+scale_color_brewer(palette=col_pal)
 
@@ -270,15 +259,13 @@ tmp %>% ggplot(aes(x=num_unit, fill=type, color=type)) + geom_line(stat="density
   theme_bw()+scale_fill_brewer(palette=col_pal)+scale_color_brewer(palette=col_pal)+ coord_cartesian(xlim=c(1,4))
 
 tmp %>% ggplot(aes(x=build_year, fill=type, color=type)) + geom_line(stat="density", size=1.2) + 
-  theme_bw()+scale_fill_brewer(palette=col_pal)+scale_color_brewer(palette=col_pal)
-# Better fit from recent build_year as mentionned earlier.
+  theme_bw()+scale_fill_brewer(palette=col_pal)+scale_color_brewer(palette=col_pal) # Better fit from recent build_year as mentionned earlier.
 
 tmp %>% ggplot(aes(x=tax_total, fill=type, color=type)) + geom_line(stat="density", size=1.2) + 
   theme_bw()+scale_fill_brewer(palette=col_pal)+scale_color_brewer(palette=col_pal)+ coord_cartesian(xlim=c(0,1e6))
 
 tmptrans %>% ggplot(aes(x=tax_total,y=abs_logerror))+geom_smooth(color="red")+theme_bw()+ 
-  coord_cartesian(xlim=c(0,1e6),ylim=c(0.05,0.2))
-# Cheaper houses tend to have a harder value to estimate.
+  coord_cartesian(xlim=c(0,1e6),ylim=c(0.05,0.2)) # Cheaper houses tend to have a harder value to estimate.
 
 tmp %>% ggplot(aes(x=tax_building, fill=type, color=type)) + geom_line(stat="density", size=1.2) + 
   theme_bw()+scale_fill_brewer(palette=col_pal)+scale_color_brewer(palette=col_pal)+ coord_cartesian(xlim=c(0,1e6))

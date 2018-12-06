@@ -1,0 +1,272 @@
+---
+title: "Project 6 (week 7)"
+author: "Marc-Antoine Gosselin"
+date: "11/17/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+To run this R markdown file, the following libraries must be installed and uploaded:
+```{r libraries, warning=FALSE, error=FALSE, message=FALSE}
+library(readxl)
+library(purrr)
+library(tidyverse)
+library(plm)
+library(imputeTS)
+library(corrplot)
+library(caret)
+library(glmnet)
+library(mlbench)
+library(psych)
+library(VIM)
+library(foreign)
+library(car)
+library(prediction)
+```
+
+Our goal in this file is to identify the best five variables to predict the dependent variable: 'Poverty gap at $3.20 a day (2012 PPP) (%)' and to make a simple forcast for the year of 2018.
+
+Let's take a look at our data:
+```{r Data Exploration, error=FALSE, warning=FALSE, message=FALSE}
+df <- read_excel('W03b_wdi.xlsx') # Loading the data
+map_dbl(df, ~sum(is.na(.))/ nrow(df)) # Lots of missing values (2017 seems to have partial data)
+map_dbl(df[, 1:4], ~length(unique(.))) # 1591 variables: data is not tidy
+df$`Country Code` <- factor(df$`Country Code`)
+```
+
+A few problems can be seen here, namely that this is a large dataset, there is a significant missing values issue and the missing values are not random, and the data is not tidy (one observation per row and each column is a variable and no duplicate information).
+
+## Pre-processing
+
+Steps to wrangle our data:
+
+* We simplify our dataframe by removing duplicate columns (removing names/ labels and leaving codes). We will create two tables, one for the indicators and one for the countries with the associated name and code for later reference.
+
+```{r, error=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
+indicator_reference <- subset(df, select = c("Indicator Name", "Indicator Code")) %>% distinct()
+df <- subset(df, select = -`Indicator Name`)
+Country_reference <- subset(df, select = c("Country Name", "Country Code")) %>% distinct()
+df <- subset(df, select = -`Country Name`)
+```
+
+* Remove countries without a value for Indicator Code: SI.POV.LMIC.GP in 2012.
+```{r, error=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+CountryCodes <- filter(df[df[, 2] == 'SI.POV.LMIC.GP', 1], df[df[, 2] == 'SI.POV.LMIC.GP', 55] != 'NA')
+df <- subset(df, `Country Code` %in% CountryCodes$`Country Code`)
+rm(CountryCodes)
+```
+
+* Subset out years 1960 to 1980, and 2017 (2017 has partial data).
+```{r, error=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+df <- subset(df, select = -c(`1960`:`1980`, `2017`))
+```
+
+* Separates dataframe into training and testing sets.
+```{r, error=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+df_test <- subset(df, select = c(1:2, 35:38)) # Excludes 2017 as well
+df <- subset(df, select = 1:34)
+```
+
+
+* Gathering time columns into one year column.
+```{r gather, error=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+df <- df %>% gather(key = 'Year', value = 'value', c(3:34)) # %>% filter(value != 'NA') 
+df_test <- df_test %>% gather(key = 'Year', value = 'value', c(3:6))
+df$Year <- factor(df$Year)
+```
+
+
+* Spread Indicator code to different columns
+```{r spread, error=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+df <- df %>% spread(key = 'Indicator Code', value = 'value')
+df_test <- df_test %>% spread(key = 'Indicator Code', value = 'value')
+```
+
+
+* Remove Indicators with over 25% missing values in training set
+```{r, error=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+dep_var <- subset(df, select = 'SI.POV.LMIC.GP')
+df <- subset(df, select = map_dbl(df, ~sum(is.na(.))/ nrow(df)) <= .25)
+df <- cbind(df, dep_var)
+df_test <- subset(df_test, select = names(df)) # Selecting the same variables as the training dataset
+rm(dep_var)
+```
+
+The end result of pre-processing limiting our data to four indicators out of 1591, returns:
+```{r dataset after pre-processing, error=FALSE, message=FALSE, results=TRUE, warning=FALSE}
+head(df[, 1:6], 2)
+```
+
+
+## Variable Selection 
+
+Imputation would be too intensive to conduct on all the data. Instead we will reduce the size of our data to easily go through the computation related to variable selection, then, once we have the few variables of interest, impute the missing values on the original data.
+
+We restrict the dataset to 2007 and 2012, imputing missing values for all except our dependent variable, because imputing the dependent variable would lead to errors. As for including two sets of years, the data contains missing values for all countries for specific years (2009-2012), I chose not to include 2008 because our variable of interest relates to the economy and 2008 was a special year resulting from the world depression that could lead to non-regular behavior in our model.
+```{r variable selection pre-processing, error=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
+df_x <- df %>% filter(df[, 2] %in% c('2012', '2007')) # Add 2007 because some variables don't have values from 2009 - 2012. Choosing 2007 because we want a year that is similar to the test set 2013-2017 and 2008 differs considerably because of a major world fiancial collapse.
+df_x <- kNN(df_x, variable = names(df_x[, 3:321]), k = 3, imp_var = FALSE) # kNN imputation
+```
+
+Filter methods do not adress multi-collinearity problems well and wrapper methods handles large numbers of explanatory variables poorly (long run-time). As a result, I will use an embbeded method for variable selection. These methods include: Ridge, LASSO, and Elastic Net. *Note: we expect LASSO (or elastic net leaning towards lasso) to be the appropriate technique because we know our variable selection have great multicollinearity*.
+
+Dependent variable examination
+```{r dependent variable examination, error=FALSE, message=FALSE, results=TRUE, warning=FALSE}
+hist(df$SI.POV.LMIC.GP) 
+```
+
+SI.POV.LMIC.GP is a non-normal distribution so we cannot use a linear model. We'll have to use GLM instead.
+
+Variable selection techniques:
+
+```{r variable selection, error=FALSE, message=FALSE, warning=FALSE}
+custom <- trainControl(method = 'repeatedcv',
+                       number = 10,
+                       repeats = 5,
+                       verboseIter = FALSE) # if verboseIter = TRUE, See the model running 
+
+# glm models
+set.seed(12)
+ridge <- train(SI.POV.LMIC.GP ~ .,
+               df_x[3:322],
+               method = 'glmnet',
+               tuneGrid = expand.grid(alpha = 0, # alpha = 0: ridge | alpha = 1: lasso | alpha >0 & <1 means elastic net
+                                      lambda =  seq(0.0001, 1, length = 5)),
+               trControl = custom,
+               na.action = na.omit)
+
+set.seed(12)
+lasso <- train(SI.POV.LMIC.GP ~ .,
+               df_x[3:322],
+               method = 'glmnet',
+               tuneGrid = expand.grid(alpha = 1, # alpha = 0: ridge | alpha = 1: lasso | alpha >0 & <1 means elastic net
+                                      lambda =  seq(0.0001, 1, length = 5)),
+               trControl = custom,
+               na.action = na.omit) 
+
+set.seed(12)
+elasticnet <- train(SI.POV.LMIC.GP ~ .,
+             df_x[3:322],
+             method = 'glmnet',
+             tuneGrid = expand.grid(alpha = seq(0, 1, length = 10), # alpha = 0: ridge | alpha = 1: lasso | alpha >0 & <1 means elastic net
+                                    lambda =  seq(0.0001, 1, length = 5)),
+             trControl = custom,
+             na.action = na.omit) 
+
+# Compare Models
+model_list <- list(Ridge = ridge, Lasso = lasso, ElasticNet = elasticnet)
+res <- resamples(model_list)
+summary(res)
+```
+
+Elastic Net is a slightly better model. Let's look at some visualisations.
+
+Plot Results:
+```{r elasticnet visualisations, error=FALSE, message=FALSE, warning=FALSE}
+elasticnet
+plot(elasticnet$finalModel, xvar = 'lambda', label = T)
+plot(elasticnet$finalModel, xvar = 'dev', label = T) # We see great risks of overfitting past .9
+plot(varImp(elasticnet, scale = F))
+```
+
+Graphs above show that there is an exponential trend in explanatory importance in the variables.
+
+Informative explanatory variables in order
+```{r five best variables, error=FALSE, message=FALSE, warning=FALSE}
+(imp <- data.frame(varImp(elasticnet, scale = F)[1]))
+(vars <- rownames(imp)[order(imp$Overall, decreasing=TRUE)[1:5]])
+```
+
+"Vars" shows the five best explanatory variables by name
+```{r names of explanatory variables, error=FALSE, message=FALSE, warning=FALSE}
+filter(indicator_reference, `Indicator Code` %in% vars)
+```
+
+
+
+## Data Formatting
+
+Before proceeding with the reduced and imputed original dataset, let's take a look at the data's structure.
+```{r, error=FALSE, message=FALSE, echo=FALSE, warning=FALSE}
+df <- subset(df, select = c("Country Code", "Year", "SI.POV.LMIC.GP", vars))
+df_test <- subset(df_test, select = c("Country Code", "Year", vars))
+
+df <- kNN(df, variable = vars, k = 5, imp_var = FALSE)
+df_test <- kNN(df_test, variable = vars, k = 5, imp_var = FALSE)
+
+df <- rename(df, 'Country' = 'Country Code')
+testDepVar <- df_test$SI.POV.LMIC.GP
+df_test <- rename(df_test, 'Country' = 'Country Code')
+
+head(df, 2)
+```
+
+
+
+## Panel Data Analysis Model
+
+Our data is panel data because our time series is repartitionned across another variable, in this case countries. 
+
+Here is a great video to explain how to handle panel data time series analysis: *https://www.youtube.com/watch?v=f01WjeCdgEA*. For step-by-step help: *https://www.princeton.edu/~otorres/Panel101R.pdf*
+
+Building the model with plm() with our five best variables
+```{r modelling,  error=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
+# scatterplot(SI.POV.LMIC.GP ~ Year|Country, boxplots=FALSE, smooth=TRUE, reg.line=FALSE, data=df)
+
+# Linear Model
+linear_model <- lm(SI.POV.LMIC.GP ~ AG.LND.ARBL.HA.PC + NY.GDP.FRST.RT.ZS + 
+                     SP.DYN.TFRT.IN + EN.ATM.CO2E.KD.GD + TM.VAL.MRCH.R6.ZS, 
+                   data = df)
+
+# Fixed effect panel data model
+fxd_effect <- plm(SI.POV.LMIC.GP ~ Country + AG.LND.ARBL.HA.PC + NY.GDP.FRST.RT.ZS + 
+                    SP.DYN.TFRT.IN + EN.ATM.CO2E.KD.GD + TM.VAL.MRCH.R6.ZS, 
+                  data = df, 
+                  method = "within",
+                  index = c("Country", "Year"))
+
+# Random effect panel model
+random <- plm(SI.POV.LMIC.GP ~ AG.LND.ARBL.HA.PC + NY.GDP.FRST.RT.ZS + 
+                  SP.DYN.TFRT.IN + EN.ATM.CO2E.KD.GD + TM.VAL.MRCH.R6.ZS, 
+              data = df, 
+              method = "within",
+              model = "random",
+              index = c("Country", "Year"))
+
+# Time effect panel data model
+time_effect <- plm(SI.POV.LMIC.GP ~ Country + lag(Year, 1) + AG.LND.ARBL.HA.PC + NY.GDP.FRST.RT.ZS + 
+                    SP.DYN.TFRT.IN + EN.ATM.CO2E.KD.GD + TM.VAL.MRCH.R6.ZS, 
+                  data = df, 
+                  method = "within",
+                  effect = "time",
+                  index = c("Country", "Year")) # Fixed effect model
+summary(time_effect)
+```
+
+Let's compare our models and choosing the best
+```{r Model Selection, warning=FALSE, message=FALSE, error=FALSE}
+summary(linear_model) # linear model is usually the basis for comparison
+summary(fxd_effect)
+
+# Comparing the models
+pFtest(fxd_effect, linear_model) # P-value is small, fxd_effect is better.
+
+summary(random)
+# Choice b/w Fixed Effect and Random Effect
+# Hausman Test
+phtest(fxd_effect, random)  # If p-value is <0.05, then the fixed effect model is betetr than random effect!
+pFtest(fxd_effect, random)  # we keep the fixed effect
+
+summary(time_effect)
+```
+
+We figure that the fixed time effect model with the effect argument in plm() returns the highest adjusted R squared. This would indicate that it is the best model to use for forecasting 2013-2017. Unfortuantely, R does not handle panel data well and does not provide an easy way to predict using plm models. For time related reasons, I will use the linear model to forecast.
+
+```{r Prediction accuracy, warning=FALSE, message=FALSE, error=FALSE}
+prediction_13to17 <- predict(linear_model, df_test)
+sqrt(mean((testDepVar - prediction_13to17)^2))
+```
+
