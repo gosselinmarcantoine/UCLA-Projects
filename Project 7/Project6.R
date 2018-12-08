@@ -126,8 +126,8 @@ plot(varImp(elasticnet, scale = F))
 # Graphs above show that there is an exponential trend in explanatory importance in the variables.
 
 # Meaningful variable names
-(imp <- data.frame(varImp(elasticnet, scale = F)[1]))
-(vars <- rownames(imp)[order(imp$Overall, decreasing=TRUE)[1:5]])
+imp <- data.frame(varImp(elasticnet, scale = F)[1])
+(vars <- rownames(imp)[order(imp$Overall, decreasing=TRUE)[1:34]])
 
 rm(df_x, imp, lasso, ridge, custom, res, model_list)
 
@@ -142,12 +142,9 @@ df <- subset(df, select = c("Country Code", "Year", "SI.POV.LMIC.GP", vars))
 dependent_variable <- df_test$SI.POV.LMIC.GP
 df_test <- subset(df_test, select = c("Country Code", "Year", vars))
 
-# Impute missing values
-df <- kNN(df, variable = c(vars, "SI.POV.LMIC.GP"), k = 5, imp_var = FALSE)
+df <- kNN(df, variable = vars, k = 5, imp_var = FALSE)
 df_test <- kNN(df_test, variable = vars, k = 5, imp_var = FALSE)
-map_dbl(df, ~sum(is.na(.))/ nrow(df))
 
-# Renaming `Country Code`
 df <- rename(df, 'Country' = 'Country Code')
 df_test <- rename(df_test, 'Country' = 'Country Code')
 
@@ -159,48 +156,54 @@ df_test <- rename(df_test, 'Country' = 'Country Code')
 
 scatterplot(SI.POV.LMIC.GP ~ Year|Country, boxplots=FALSE, smooth=TRUE, reg.line=FALSE, data=df)
 
-# Linear Model
-linear_model <- lm(SI.POV.LMIC.GP ~ AG.LND.ARBL.HA.PC + NY.GDP.FRST.RT.ZS + 
-                     SP.DYN.TFRT.IN + EN.ATM.CO2E.KD.GD + TM.VAL.MRCH.R6.ZS, 
-                   data = df)
-summary(linear_model)
+linear_model <- lm(
+  as.formula(paste0("SI.POV.LMIC.GP ~ ", paste(vars, collapse = " + "))),
+  data = df)
 
 # Fixed effect panel data model
-fxd_effect <- plm(SI.POV.LMIC.GP ~ Country + AG.LND.ARBL.HA.PC + NY.GDP.FRST.RT.ZS + 
-                    SP.DYN.TFRT.IN + EN.ATM.CO2E.KD.GD + TM.VAL.MRCH.R6.ZS, 
-                  data = df, 
-                  method = "within",
-                  index = c("Country", "Year"))
-summary(Fxd_effect)
+fxd_effect <- plm(
+  as.formula(paste0("SI.POV.LMIC.GP ~ ", "Country + ", paste(vars, collapse = " + "))),
+  data = df,
+  method = "within",
+  index = c("Country", "Year"))
+
+# Random effect panel model
+random <- plm(
+  as.formula(paste0("SI.POV.LMIC.GP ~ ", paste(vars, collapse = " + "))),
+  data = df,
+  method = "within",
+  model = "random",
+  index = c("Country", "Year"))
+
+# Time effect panel data model
+time_effect <- plm(
+  as.formula(paste0("SI.POV.LMIC.GP ~ ", "lag(Year, 1) + ", paste(vars, collapse = " + "))),
+  data = df,
+  method = "within",
+  effect = "time",
+  index = c("Country", "Year")) # Fixed effect model
+
+# Comparing the models ----------------------------------------------------
+
+linear <- summary(linear_model) # linear model is usually the basis for comparison
+linear$adj.r.squared
+
+fxd <- summary(fxd_effect)
+fxd$r.squared
 
 # Comparing the models
 pFtest(fxd_effect, linear_model) # P-value is small, fxd_effect is better.
 
-# Random effect panel model
-random <- plm(SI.POV.LMIC.GP ~ AG.LND.ARBL.HA.PC + NY.GDP.FRST.RT.ZS + 
-                  SP.DYN.TFRT.IN + EN.ATM.CO2E.KD.GD + TM.VAL.MRCH.R6.ZS, 
-              data = df, 
-              method = "within",
-              model = "random",
-              index = c("Country", "Year"))
-summary(random)
+rand <- summary(random)
+rand$r.squared
 
 # Choice b/w Fixed Effect and Random Effect
 # Hausman Test
-phtest(fxd_effect, random)  # If p-value is <0.05, then the fixed effect model is betetr than random effect!
+phtest(fxd_effect, random)  # If p-value is <0.05, then the fixed effect model is better than random effect!
 pFtest(fxd_effect, random)  # we keep the fixed effect
 
-# Time effect panel data model
-time_effect <- plm(SI.POV.LMIC.GP ~ Country + lag(Year, 1) + AG.LND.ARBL.HA.PC + NY.GDP.FRST.RT.ZS + 
-                    SP.DYN.TFRT.IN + EN.ATM.CO2E.KD.GD + TM.VAL.MRCH.R6.ZS, 
-                  data = df, 
-                  method = "within",
-                  effect = "time",
-                  index = c("Country", "Year")) # Fixed effect model
-summary(time_effect)
-
-# Comparing fxd_effect to time_effect
-
+time <- summary(time_effect)
+time$r.squared
 
 # Model Prediction --------------------------------------------------------
 
@@ -209,15 +212,11 @@ summary(time_effect)
 
 # Linear model forecast
 LMprediction <- predict(linear_model, df_test)
+Predicted <- cbind(df_test, Actual = dependent_variable, Prediction = LMprediction)
 
-# Random effect forecast
-RANDOMprediction <- predict(random, data = df_test, at = null, calculate_se = FALSE)
-
-# Root Mean Squared Error
-sqrt(mean((dependent_variable - LMprediction), na.rm = TRUE)^2)
-sqrt(mean((dependent_variable - RANDOMprediction), na.rm = TRUE)^2)
-
-# Random effect forecast is better:
-Predicted <- cbind(df_test, Actual = dependent_variable, Prediction = RANDOMprediction)
-
-
+# Prediction accuracy
+Predicted$Prediction <- as.numeric(Predicted$Prediction)
+Predicted$Actual <- as.numeric(Predicted$Actual)
+Predicted <- Predicted %>% mutate(Error = Actual - Prediction)
+sqrt(sum(Predicted$Error^2, na.rm = TRUE))
+sum(!is.na(Predicted$Error))

@@ -135,6 +135,6 @@ predict_rf <- predict(fit.rf, blood_test)
 blood_test$Donation <- predict_rf 
 blood_test <- cbind(blood_test, predict(fit.rf, blood_test, type = "prob"))
 blood_test <- blood_test %>% mutate(Percentage = ifelse(Donation == 0, `0`, `1`)) %>% select(-`0`, -`1`)
-# Percentage is percentage of certainty for the Donation value.
+# Percentage is the certainty level for the predicted Donation value.
 
 write.csv(x = blood_test, file = "BloodDonationPredictions")
