@@ -1,4 +1,7 @@
 
+# data for X was too large to include in github. To load the data 
+
+
 # Dashboard Set up --------------------------------------------------------
 
 library(shiny)
@@ -17,25 +20,19 @@ library(tseries)
 
 setwd('~/Documents/DataScience/UCLADatascience/CapstoneDashboard')
 
-# Gun Violence Incidents --------------------------------------------------
+# Data Loading ------------------------------------------------------------
 
-# gun <- data.table::fread('gun-violence-data_01-2013_03-2018.csv', header=TRUE, stringsAsFactors = FALSE) # Fread() 
 PieChart <- read.csv("PieChartCapstone", header = T)
 victimsPerState <- read.csv('victimsPerStateCapstone', header = T, sep = ",")
 percVictimsPerState <- read.csv('percVictimsPerStateCapstone', header = T, sep = ",")
 time_incidents <- read.csv('TimeIncidentsCapstone', header = T, sep = ",")
-X <- read.csv("XCapstone", header = T, sep = ",")
 
-# # Histogram of State comparisons
-# 
-# incident_type_COL <- PieChart$incident_type
-# diffStates <- PieChart[, 2:53]
-# denom <- rep(colSums(diffStates), each = 10)
-# diffStates <- diffStates/denom * 100
-# diffStates <- cbind(incident_type_COL, diffStates)
-# colnames(diffStates)[1] <- "incident_type"
-# write.csv(diffStates, "StatesComp", row.names = FALSE, quote = FALSE)
-# StatesComp <- read.csv("StatesComp", header = T)
+X1 <- read.csv("X1Capstone", header = T, sep = ",")
+X2 <- read.csv("X2Capstone", header = T, sep = ",")
+X3 <- read.csv("X3Capstone", header = T, sep = ",")
+X4 <- read.csv("X4Capstone", header = T, sep = ",")
+X5 <- read.csv("X5Capstone", header = T, sep = ",")
+X <- rbind(X1, X2, X3, X4, X5)
 
 # dashHead (UI) -----------------------------------------------------------
 
